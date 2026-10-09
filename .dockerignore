@@ -1,0 +1,12 @@
+.venv
+
+.git
+
+*.pyc
+
+.env
+
+media
+
+staticfiles
+

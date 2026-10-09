@@ -1,0 +1,7 @@
+# Packages needed in EVERY environment (dev, test, production).
+# The Django framework.
+Django>=6.1,<7.0
+# PostgreSQL driver. [binary] = pre-built, no compiler needed.
+psycopg[binary]>=3.2
+# Reads settings from environment variables and the .env file.
+django-environ>=0.11

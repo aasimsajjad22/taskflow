@@ -1,0 +1,19 @@
+# Virtual environment (like vendor/).
+.venv/
+# Secrets.
+.env
+# Python cache files.
+__pycache__/
+*.pyc
+# pytest cache folder.
+.pytest_cache/
+# Ruff cache folder.
+.ruff_cache/
+# User uploads and collected static files.
+media/
+staticfiles/
+# macOS system files.
+.DS_Store
+# Editor folders.
+.idea/
+.vscode/

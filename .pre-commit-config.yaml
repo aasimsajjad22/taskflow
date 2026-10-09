@@ -1,0 +1,14 @@
+# Checks that run automatically before every "git commit".
+# List of tool repositories to use.
+repos:
+  # Ruff's official pre-commit hooks.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Version of the hooks. Run "pre-commit autoupdate" to move to the newest version.
+    rev: v0.16.10
+    # The hooks (checks) to run from this repo.
+    hooks:
+      # Lint, and fix what can be fixed automatically.
+      - id: ruff-check
+        args: [--fix]
+      # Format the code.
+      - id: ruff-format

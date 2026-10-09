@@ -1,0 +1,5 @@
+# Packages for production.
+# Include everything from base.txt.
+-r base.txt
+gunicorn>=22.0
+# Production web s

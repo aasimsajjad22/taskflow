@@ -1,0 +1,62 @@
+# Runs our whole local stack: the Django app + PostgreSQL. Like Laravel Sail.
+
+# List of containers (services) to run.
+services:
+  # ---------------- PostgreSQL database ----------------
+  db:
+    # Use the official PostgreSQL 16 image from Docker Hub (no Dockerfile needed).
+    image: postgres:16
+    # Variables the Postgres image reads on FIRST start to create the database.
+    environment:
+      # Name of the database to create.
+      POSTGRES_DB: taskflow
+      # User to create.
+      POSTGRES_USER: taskflow
+      # Password for that user. Fine for local dev only.
+      POSTGRES_PASSWORD: taskflow
+    # Port mapping "Mac port : container port".
+    # We use 5433 on the Mac because 5432 may be used by your Homebrew Postgres (Day 2).
+    ports:
+      - "5433:5432"
+    # Save database files in a named volume, so data survives container restarts.
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Check if Postgres is ready to accept connections.
+    healthcheck:
+      # pg_isready is a small Postgres tool that answers "ready" or "not ready".
+      test: ["CMD-SHELL", "pg_isready -U taskflow -d taskflow"]
+      # Run the check every 5 seconds.
+      interval: 5s
+      # Give each check 5 seconds before it counts as failed.
+      timeout: 5s
+      # After 5 failed checks, mark the container as unhealthy.
+      retries: 5
+
+  # ---------------- Django app ----------------
+  web:
+    # Build the image from the Dockerfile in this folder (".").
+    build: .
+    # Load variables from our .env file into the container.
+    env_file: .env
+    # Extra variables. These OVERRIDE the same names from .env.
+    environment:
+      # Inside Docker, the database host is the service name "db", and the port is 5432
+      # (the container's own port, not the Mac's 5433).
+      DATABASE_URL: postgres://taskflow:taskflow@db:5432/taskflow
+    # Make the app reachable at http://localhost:8000 on your Mac.
+    ports:
+      - "8000:8000"
+    # Mount your project folder into /app in the container.
+    # So when you save a file on your Mac, the container sees it right away
+    # and the dev server reloads. No rebuild needed for code changes.
+    volumes:
+      - .:/app
+    # Start "web" only AFTER "db" passes its healthcheck.
+    # Without this, Django might start before Postgres is ready and crash.
+    depends_on:
+      db:
+        condition: service_healthy
+
+# Named volumes used above. Docker manages where they live on disk.
+volumes:
+  postgres_data:

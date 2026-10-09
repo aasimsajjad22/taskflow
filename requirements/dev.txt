@@ -1,0 +1,11 @@
+# Packages for local development and testing.
+# First, include everything from base.txt (like "require" + "require-dev").
+-r base.txt
+# The test runner (like PHPUnit / Pest).
+pytest>=8.0
+# Lets pytest work with Django (database, settings, test client).
+pytest-django>=4.9
+# Linter + formatter in one tool (like Pint + part of PHPStan).
+ruff>=0.6
+# Runs checks automatically before each git commit.
+pre-commit>=3.7

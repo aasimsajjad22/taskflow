@@ -1,0 +1,35 @@
+# Settings for Ruff (formatter + linter).
+[tool.ruff]
+# Maximum line length. 100 is a common team choice (default is 88).
+line-length = 100
+# Our Python version. Ruff suggests modern syntax for this version.
+target-version = "py312"
+# Don't check auto-generated migration files.
+extend-exclude = ["*/migrations/*"]
+# Which lint rule groups to turn on.
+[tool.ruff.lint]
+select = [
+    # E: pycodestyle errors (basic style problems).
+    "E",
+    # F: Pyflakes (unused imports, undefined names: real bugs).
+    "F",
+    # I: isort (sorts imports in a standard order).
+    "I",
+    # B: flake8-bugbear (common bug patterns, like mutable default arguments).
+    "B",
+    # UP: pyupgrade (use modern Python syntax).
+    "UP",
+    # DJ: flake8-django (Django-specific mistakes, e.g. a model without __str__).
+    "DJ",
+]
+# Rules to skip in certain files.
+[tool.ruff.lint.per-file-ignores]
+# Settings files use "from .base import *" on purpose.
+# F403 = "star import used", F405 = "name may come from a star import".
+"config/settings/*" = ["F403", "F405"]
+# Settings for pytest.
+[tool.pytest.ini_options]
+# Use the test settings when running tests.
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+# Which files contain tests.
+python_files = ["tests.py", "test_*.py"]
