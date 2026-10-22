@@ -1,0 +1,15 @@
+{# HTML digest. Variables are auto-escaped. #}
+<p>Hi {{ user.first_name|default:user.email }},</p>
+{# |pluralize adds an "s" when total is not 1. #}
+<p>You have <strong>{{ total }}</strong> overdue task{{ total|pluralize }}:</p>
+<ul>
+  {# One line per task. #}
+  {% for task in tasks %}
+    <li><strong>{{ task.project.key }}-{{ task.id }}</strong>: {{ task.title }} (due {{ task.due_date }})</li>
+  {% endfor %}
+</ul>
+{# Only shown when we didn't list them all. #}
+{% if total > tasks|length %}
+  <p>Showing the first {{ tasks|length }}. <a href="{{ overdue_url }}">See all overdue tasks</a></p>
+{% endif %}
+<p>— TaskFlow</p>

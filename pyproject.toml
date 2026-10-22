@@ -21,6 +21,8 @@ select = [
     "UP",
     # DJ: flake8-django (Django-specific mistakes, e.g. a model without __str__).
     "DJ",
+    # ISC: implicit string concatenation (catches a missing comma between strings in a list).
+    "ISC",
 ]
 # Rules to skip in certain files.
 [tool.ruff.lint.per-file-ignores]

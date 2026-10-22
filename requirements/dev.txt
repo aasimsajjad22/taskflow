@@ -9,3 +9,17 @@ pytest-django>=4.9
 ruff>=0.6
 # Runs checks automatically before each git commit.
 pre-commit>=3.7
+
+django-debug-toolbar>=4.4
+
+uvicorn>=0.30
+
+# factory_boy: test data factories (like Laravel's model factories). Includes Faker.
+factory-boy>=3.3
+# pytest-cov: shows which lines the tests run (code coverage).
+pytest-cov>=5.0
+# respx: fakes HTTP calls made with httpx in tests (like Laravel's Http::fake()).
+respx>=0.21
+
+# websockets: a WebSocket client, to try our real-time endpoint from a script (Phase 10).
+websockets>=13.0

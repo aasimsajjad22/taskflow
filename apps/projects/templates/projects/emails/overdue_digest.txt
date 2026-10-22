@@ -1,0 +1,11 @@
+{# Plain-text digest. autoescape off: plain text, not HTML. #}
+{% autoescape off %}Hi {{ user.first_name|default:user.email }},
+
+You have {{ total }} overdue task{{ total|pluralize }}:
+{% for task in tasks %}
+  - {{ task.project.key }}-{{ task.id }}: {{ task.title }} (due {{ task.due_date }}){% endfor %}
+{% if total > tasks|length %}
+Showing the first {{ tasks|length }}. See all: {{ overdue_url }}
+{% endif %}
+— TaskFlow
+{% endautoescape %}

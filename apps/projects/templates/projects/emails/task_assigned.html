@@ -1,0 +1,14 @@
+{# HTML version of the same email. Variables are auto-escaped here, which protects against HTML injection. #}
+<p>Hi {{ assignee.first_name|default:assignee.email }},</p>
+<p>You were assigned a task in <strong>{{ project.name }}</strong>:</p>
+<ul>
+  {# Task key and title, e.g. WEB-42: Fix login #}
+  <li><strong>{{ project.key }}-{{ task.id }}</strong>: {{ task.title }}</li>
+  {# get_priority_display shows "High" instead of 3. #}
+  <li>Priority: {{ task.get_priority_display }}</li>
+  {# The |default filter shows a text when due_date is empty. #}
+  <li>Due date: {{ task.due_date|default:"no due date" }}</li>
+</ul>
+{# A link to the task in the frontend app. #}
+<p><a href="{{ task_url }}">Open the task</a></p>
+<p>— TaskFlow</p>

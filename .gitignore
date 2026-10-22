@@ -7,6 +7,9 @@ __pycache__/
 *.pyc
 # pytest cache folder.
 .pytest_cache/
+# Test coverage data and HTML reports (pytest-cov).
+.coverage
+htmlcov/
 # Ruff cache folder.
 .ruff_cache/
 # User uploads and collected static files.
@@ -17,3 +20,6 @@ staticfiles/
 # Editor folders.
 .idea/
 .vscode/
+# Celery Beat runtime state (last run times), rewritten while Beat runs.
+celerybeat-schedule*
+

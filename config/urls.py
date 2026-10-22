@@ -15,7 +15,29 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from django.conf import settings
+
+# static(): a helper that serves files from a folder. Development only.
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-urlpatterns = [path("admin/", admin.site.urls), path("", include("apps.core.urls"))]
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("", include("apps.core.urls")),
+    path("api/v1/", include("config.api_router")),
+    path("api-auth/", include("rest_framework.urls")),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="api-docs"),
+]
+
+# In development, let runserver serve uploaded/generated files (like export CSVs) from MEDIA_ROOT.
+# In production, a web server or cloud storage (S3) serves them instead.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+if "debug_toolbar" in settings.INSTALLED_APPS:
+    from debug_toolbar.toolbar import debug_toolbar_urls
+
+    urlpatterns += debug_toolbar_urls()

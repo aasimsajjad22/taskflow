@@ -10,9 +10,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -37,6 +39,7 @@ ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 # Application definition
 
 DJANGO_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -44,12 +47,27 @@ DJANGO_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 ]
-THIRD_PARTY_APPS = []
-LOCAL_APPS = ["apps.core", "apps.users"]
+THIRD_PARTY_APPS = [
+    "rest_framework",
+    "django_filters",
+    "drf_spectacular",
+    "rest_framework_simplejwt.token_blacklist",
+    "corsheaders",
+]
+
+LOCAL_APPS = [
+    "apps.core",
+    "apps.users",
+    "apps.projects",
+    "apps.workspaces",
+    "apps.audit",
+    "apps.realtime",
+]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -145,4 +163,174 @@ LOGGING = {
     },
     # The root logger: everything at INFO level or higher goes to the console.
     "root": {"handlers": ["console"], "level": "INFO"},
+}
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.DefaultPagination",
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
+    # Phase 10: API versions chosen by the client in the Accept header:
+    #   Accept: application/json; version=2
+    # No version (all existing clients) = version 1, so nobody breaks. An unknown version = 406.
+    "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.AcceptHeaderVersioning",
+    "DEFAULT_VERSION": "1",
+    "ALLOWED_VERSIONS": ["1", "2"],
+    # Phase 10 (OWASP API4, "unrestricted resource consumption"): a baseline limit for
+    # EVERY endpoint. Anonymous clients are counted per IP, logged-in users per user id.
+    # (A view that sets its own throttle_classes, like the auth views, replaces these.)
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    # Rate limits by name. The counters live in the cache (Redis).
+    "DEFAULT_THROTTLE_RATES": {
+        # Baselines. 300/minute per user leaves room for normal use (and the export polling
+        # from Phase 7B: one request per second), but stops scripts hammering the API.
+        "anon": "60/minute",
+        "user": "300/minute",
+        # "auth": 10 requests per minute per IP, to slow down password guessing.
+        "auth": "10/minute",
+        # Expensive or sensitive actions get their own, stricter limits (Phase 10):
+        # each insights call triggers 3 outside requests (cost + their rate limits)...
+        "insights": "20/minute",
+        # ...each export scans a whole workspace and stores a file...
+        "exports": "10/hour",
+        # ...and adding members tells whether an email is registered (enumeration).
+        "invites": "20/hour",
+    },
+}
+
+SPECTACULAR_SETTINGS = {
+    # Title shown at the top of the docs page.
+    "TITLE": "TaskFlow API",
+    # Short description shown under the title.
+    "DESCRIPTION": "Workspaces, projects, tasks, and comments.",
+    # Version of our API.
+    "VERSION": "1.0.0",
+    # Don't list the schema endpoint itself inside the docs.
+    "SERVE_INCLUDE_SCHEMA": False,
+    # Only advertise Basic auth in the schema, so Postman/Swagger use it.
+    # (Session login still works at runtime, it's just not listed.)
+    "AUTHENTICATION_WHITELIST": ["rest_framework.authentication.BasicAuthentication"],
+    # Two models have a "status" field with different choices. Give each choice list
+    # its own clear name in the docs (otherwise both want to be called "StatusEnum").
+    "ENUM_NAME_OVERRIDES": {
+        "TaskStatusEnum": "apps.projects.models.Task.Status",
+        "TaskExportStatusEnum": "apps.projects.models.TaskExport.Status",
+    },
+    "COMPONENT_SPLIT_REQUEST": True,
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
+    "UPDATE_LAST_LOGIN": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="TaskManager <no-reply@taskmanager.local>")
+
+MAILERS = {
+    "default": {
+        # Send real emails over SMTP.
+        "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+        # Where the SMTP server is. Mailpit listens on port 1025 in development.
+        "OPTIONS": {
+            "host": env("EMAIL_HOST", default="localhost"),
+            "port": env.int("EMAIL_PORT", default=1025),
+            # Give up after 10 seconds instead of waiting forever.
+            "timeout": 10,
+        },
+    },
+}
+
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
+
+# ---------------------------------------------------------------------------
+# Celery (background jobs). config/celery.py reads every setting that starts with CELERY_.
+# ---------------------------------------------------------------------------
+# Where jobs wait: Redis database number 0. Like QUEUE_CONNECTION=redis in Laravel.
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
+# Keep trying to connect to Redis if it isn't up yet when the worker starts.
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# Use the same time zone as Django (for schedules).
+CELERY_TIMEZONE = TIME_ZONE
+# We don't read task return values from code, so don't store them anywhere.
+CELERY_TASK_IGNORE_RESULT = True
+# Remove a job from Redis only AFTER it finished, not when the worker takes it.
+# If a worker crashes in the middle, the job is not lost: another worker runs it again.
+CELERY_TASK_ACKS_LATE = True
+# Each worker process takes only one job at a time (fair with long jobs + acks_late).
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+# Kill a job that runs longer than 5 minutes (protects against stuck jobs).
+CELERY_TASK_TIME_LIMIT = 5 * 60
+
+# ---------------------------------------------------------------------------
+# Cache (Redis). Used in Phase 5 to remember "this email was already sent today".
+# ---------------------------------------------------------------------------
+CACHES = {
+    "default": {
+        # Django's built-in Redis cache backend.
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        # Redis database number 1 (Celery uses number 0). Each number is a separate space.
+        "LOCATION": env("REDIS_CACHE_URL", default="redis://localhost:6379/1"),
+    }
+}
+
+# Scheduled jobs for Celery Beat. Like $schedule->job(...) in Laravel's scheduler.
+CELERY_BEAT_SCHEDULE = {
+    # Any unique name for this schedule entry.
+    "overdue-digests-every-morning": {
+        # The full name of the task (module path + function name).
+        "task": "apps.projects.tasks.send_overdue_digests",
+        # When: every day at 08:00 (in CELERY_TIMEZONE). crontab works like a cron line.
+        "schedule": crontab(minute="*/5"),
+    },
+}
+
+# ---------------------------------------------------------------------------
+# External services (Phase 6: the async "insights" endpoint)
+# ---------------------------------------------------------------------------
+# Base URL of the external services. In development: our own fake services at /fake/.
+EXTERNAL_SERVICES_URL = env("EXTERNAL_SERVICES_URL", default="http://localhost:8000/fake")
+# Never wait longer than this (in seconds) for ONE external service.
+EXTERNAL_TIMEOUT_SECONDS = env.float("EXTERNAL_TIMEOUT_SECONDS", default=2.0)
+
+# ---------------------------------------------------------------------------
+# CORS (Phase 7): which browser origins may call this API
+# ---------------------------------------------------------------------------
+# The frontend's exact origin(s): scheme + host + port. Vite's dev server runs on port 5173.
+# NEVER use "allow all origins" for an API that uses logins.
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173"])
+# Response headers the frontend's JavaScript may READ. By default the browser hides all
+# but a few basic ones, so our ETag (Phase 6) and X-Cache headers must be listed here.
+CORS_EXPOSE_HEADERS = ["ETag", "X-Cache"]
+
+# ---------------------------------------------------------------------------
+# Channels: WebSockets (Phase 10)
+# ---------------------------------------------------------------------------
+# The ASGI entry point (HTTP + WebSockets). runserver (via daphne) and ASGI servers use it.
+ASGI_APPLICATION = "config.asgi.application"
+# The channel layer: the message bus that lets any process (a web request, a Celery job)
+# send messages to WebSocket clients connected to OTHER processes. Redis database 2
+# (0 = Celery queue, 1 = cache).
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [env("CHANNEL_LAYER_URL", default="redis://localhost:6379/2")]},
+    },
 }

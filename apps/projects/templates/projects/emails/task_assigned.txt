@@ -1,0 +1,13 @@
+{# Plain-text version of the email. autoescape off: this is not HTML, so don't turn "&" into "&amp;". #}
+{% autoescape off %}Hi {{ assignee.first_name|default:assignee.email }},
+
+You were assigned a task in {{ project.name }}:
+
+  {{ project.key }}-{{ task.id }}: {{ task.title }}
+  Priority: {{ task.get_priority_display }}
+  Due date: {{ task.due_date|default:"no due date" }}
+
+Open it here: {{ task_url }}
+
+— TaskFlow
+{% endautoescape %}
